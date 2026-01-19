@@ -1,0 +1,29 @@
+deck
+N <- 10000
+S <- numeric(N)
+for (i in seq_len(N)) {
+  shuffled_index <- sample.int(nrow(deck))
+  values <- deck$value[shuffled_index]
+  n_drawn <- 2
+  s_tmp <- sum(values[1:n_drawn])
+  while (s_tmp < 17) {
+    old <- s_tmp
+    n_drawn <- n_drawn + 1
+    s_tmp <- sum(values[1:n_drawn])
+    if (old+11<=s_tmp) {
+        s_tmp <- s_tmp-10
+    }
+  }
+  
+  S[i] <- s_tmp
+}
+ggplot() +
+  theme_classic() +
+  geom_histogram(aes(x = S), binwidth = 1)
+  
+p21 <- sum(S>21)/N
+avgS <- mean(S)
+varS <- mean((S-avgS)^2)
+p21
+avgS
+varS	

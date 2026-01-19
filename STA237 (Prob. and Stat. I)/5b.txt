@@ -1,0 +1,74 @@
+N <- 1000
+X1 <- numeric(N)
+X2 <- numeric(N)
+player <- function(player_cards, dealer_card) {
+    score <- score_blackjack(player_cards)
+    hasace <- 'A' %in% player_cards$numbers
+    deal <- sum(dealer_card$value)
+    decision <- TRUE
+    if (score == 12 & ((2 <= deal & deal <= 3) | deal >= 7)) {
+        decision <- TRUE
+    }
+    if (score == 12 & (4 <= deal & deal <= 6)) {
+        decision <- hasace
+    }
+    if ((13<= score & score <= 16) & deal <= 6) {
+        decision <- hasace
+    }
+    if ((13<= score & score <= 16) & deal >= 7) {
+        decision <- TRUE
+    }
+    if (score==17) {
+        decision <- hasace
+    }
+    if (score==18 & deal <= 8) {
+        decision <- FALSE
+    }
+    if (score >= 19) {
+        decision <- FALSE
+    }
+    
+  return(decision)
+}
+play_a_round <- function(shuffled, position = 1) {
+  # takes shuffled deck and the current position
+  # of the top of the undealt deck as input arguments
+  # deal first pairs
+  # feel free to modify the function as needed
+  player_hand <- c(position, position + 1)
+  dealer_hand <- c(position + 2:3)
+  position <- position + 4
+  while (player(shuffled[player_hand, ], shuffled[dealer_hand[1], ])) {
+    player_hand <- c(player_hand, position)
+    position <- position + 1
+  }
+  player_score <- score_blackjack(shuffled[player_hand, ])
+  if (player_score == 21) {
+    return(c(TRUE, position)) # player wins immediately
+  }
+  if (player_score > 21) {
+    return(c(FALSE, position)) # player loses immediately
+  }
+  while (dealer(shuffled[dealer_hand, ])) {
+    dealer_hand <- c(dealer_hand, position)
+    position <- position + 1
+  }
+  dealer_score <- score_blackjack(shuffled[dealer_hand, ])
+  # return c(winner, current position)
+  return(c(winner(player_score, dealer_score), position))
+}
+for (i in seq_len(N)) {
+    shuffled <- deck[sample(1:nrow(deck)), ] 
+    result1 <- play_a_round(shuffled)
+    X1[i] <- result1[1]
+    result2 <- play_a_round(shuffled, position=result1[2])
+    X2[i] <- result2[1]
+}
+e1 <- mean(X1)
+e1
+e2 <- mean(X2)
+e2
+e12 <- mean(X1*X2)
+e12
+cov <- e12-e1*e2
+cov

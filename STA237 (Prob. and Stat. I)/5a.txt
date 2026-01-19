@@ -1,0 +1,14 @@
+A <- 100
+N <- 10000
+m <- 100
+sims <- numeric(m)
+for (i in 1:m) {
+    sims[i] <- sum(10 * rexp(N ,1/10))/N
+}
+p <- sum(abs(sims-A)>0.5)/m
+p
+bound <- 40000/N
+bound
+
+df <- data.frame(estimate=sims)
+ggplot(df, mapping=aes(x=estimate, fill = abs(sims - A) > .5))+geom_histogram(binwidth = .25)
