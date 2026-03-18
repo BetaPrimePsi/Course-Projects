@@ -1,0 +1,295 @@
+---
+title: "Stat 847 Winter 2026 Analysis 1"
+author: "Due: Monday Feb 2, 2026, Name: Gurmanjot Singh, Waterloo ID: 21217394"
+output: pdf_document
+---
+
+Your assignment must be submitted by the due date listed at the top of this document, and it must be submitted electronically in .pdf format via Crowdmark.
+
+Organization and comprehensibility is part of a full solution. Consequently, points will be deducted for solutions that are not organized and incomprehensible. Furthermore, if you submit your assignment to Crowdmark, but you do so incorrectly in any way (e.g., you upload your Question 2 solution in the Question 1 box), you will receive a 5% deduction (i.e., 5% of the assignment’s point total will be deducted from your point total).
+
+There are 2 questions worth a total of 35 marks.
+
+Question 1 uses ebay data collected from: <https://www.kaggle.com/datasets/promptcloud/ebay-product-dataset?resource=download>
+
+Question 2 uses autobiographical data collected from a Muse 2 headset and the Mind Monitor app.
+
+\newpage
+
+```{r}
+# Imports for rest of assignment
+library(tidyr)
+library(stringr)
+library(plyr)
+library(dplyr)
+library(mice)
+```
+
+# Question 1: eBay analysis (17 marks total)
+
+## Question 1a: My brand! (3 marks)
+
+Open the csv file `ebay_sample.csv` as a data frame with `read.csv()`. Use `str_extract()` in `stringr` to get the first word from the title and use `toupper()` to force everything into uppercase. The `is.na()` function will also be useful.
+
+(Note: like everything in this class, you don't NEED to use these functions. If you know of a better way, or you are using Python or Julia to do the same thing, you may use those tool instead, as long as the reported results match the key.)
+
+Only take alphabetical names, and return a blank "" for anything that does not fit the pattern.
+
+Save the results as a new variable in the dataset as "Brand". Report the first 20 values of `df$Brand`.
+
+For example:
+
+`Nintendo Game Boy Pocket Console " Gold " TESTED /10567"` should return `NINTENDO`.
+
+`Apple iPhone 7 128GB Unlocked Smartphone - Rose Gold (A1660) for sale online` should return `APPLE`
+
+`9312527975947` should return a blank. (NOT AN NA, but "")
+
+`(10) REPLACEMENT BULBS FOR PONTIAC G3 YEAR 2009 BRAKE LIGHT 28.54W 12.80V` should return a blank. (NOT AN NA, but "")
+
+------------------------------------------------------------------------
+
+The code and result of extracting the first word and outputting the first 20 examples:
+
+```{r}
+df <- read.csv("ebay_sample.csv")
+
+# Find first alphabetical word of title and convert to upper case
+df$Brand <- toupper(str_extract(df$Title, "^[A-Za-z]+"))
+
+# Convert NA to ""
+df$Brand[is.na(df$Brand)] <- ""
+
+# First 20 values
+df$Brand[1:20]
+
+
+```
+
+## Question 1b: Reading prices. (3 marks)
+
+Using functions like `as.numeric()` and `str_replace()` or `str_replace_all()`, remove the commas and dollar signs from the variable `Price` and save the results in a new variable called `PriceNumeric` which is the price saved as a number instead of a string. (Watch your escape characters!)
+
+`$1,210.56` should become `1210.56`,
+
+`$8.95` should become `8.95`, and
+
+`NA` should stay as `NA`.
+
+Report the sum of the first 20 prices, with the `NA`s removed (Hint: Use the `na.rm` argument)
+
+------------------------------------------------------------------------
+
+The code and result for converting the price strings into numeric format and the sum of the first 20 non-NA prices:
+
+```{r}
+# Convert prices to numeric form after removing all commas and dollar signs
+df$PriceNumeric <- as.numeric(str_replace_all(df$Price, "[\\$,]", ""))
+
+# Sum of first 20 prices without NAs
+sum(df$PriceNumeric[1:20], na.rm = TRUE)
+```
+
+## Question 1c: Finding the Nintendos. (5 marks)
+
+Using the data frame that you've processed so far and functions like `subset()` or the tidyverse `filter()`, write and use code to find all the sales of consoles with the brand `NINTENDO`. Don't worry for now about consoles that are made by Nintendo that have a brand other than `NINTENDO` because of differences in the listing. That is, find every listing that has the words `console` or `classic` AND at least one of `nes`, `snes`, `n64` `gamecube`, `wii`, `wii u`, or `switch`. Don't worry about the Switch 2, as it wasn't out when these listings were scraped. (Also don't worry about the Virtual Boy)
+
+EXCLUDE any listings that are less than 50 dollars that have the word `controller` in them.
+
+Save the new data frame as `df_nintendo`, and report the number of rows of this new data frame with `nrow()`
+
+------------------------------------------------------------------------
+
+The code and result for filtering the sales to exclusively the Nintendo consoles, excluding the possible controller sales verified with cheap \<\$50 prices:
+
+```{r}
+# Composed filter for Nintendo console sales
+df_nintendo <- df %>%
+  # Brand filter
+  filter(Brand == "NINTENDO") %>%
+  # console/classic filter
+  filter(grepl("console|classic", Title, ignore.case = TRUE)) %>%
+  # Console model filter
+  filter(grepl("nes|snes|n64|gamecube|wii u|wii|switch", Title, ignore.case = TRUE)) %>%
+  # Exclude <$50 prices and controller sales
+  filter(!(PriceNumeric < 50 & grepl("controller", Title, ignore.case = TRUE)))
+
+# Number of rows
+nrow(df_nintendo)
+```
+
+## Question 1d: There are different kinds of Nintendos? (2 marks)
+
+Make a new variable in `df_nintendo` for the console type by extracting the first instance of `nes`, `snes`, `n64` `gamecube`, `wii`, `wii u`, or `switch` in the listing. Be mindful of substrings; "wii u" should not be overwritten with "wii", and "snes" should not be overwritten by "nes".
+
+Report the `table()` of the number of consoles of each type for sale.
+
+------------------------------------------------------------------------
+
+Code and resulting table of console types after extracting the largest available console name in the sale title to ensure that false overwrites don't occur:
+
+```{r}
+# Check longer console names first and extract console type
+df_nintendo$console_type <- str_extract(tolower(df_nintendo$Title), 
+                                        "wii u|gamecube|switch|snes|wii|n64|nes")
+
+# Table of console types
+table(df_nintendo$console_type)
+```
+
+## Question 1e: How much for the Nintendo? (4 marks)
+
+Using functions like `ddply` create a dataset called `df_consoles`, which has the following features.
+
+-   7 rows, one for each of the listed consoles
+-   A self-explanatory `console_name` variable
+-   An average price (NAs removed) of prices for each console named `avg_price`
+-   A standard deviation of prices (NAs removed) named `sd_price`
+-   The number of listings of that console found, named `n_listings`
+
+------------------------------------------------------------------------
+
+Code and resulting output of summary statistics using `ddply`:
+
+```{r}
+# Create summary statistics per console type
+df_consoles <- ddply(df_nintendo, .(console_type), summarize,
+                     console_name = unique(console_type),
+                     avg_price = mean(PriceNumeric, na.rm = TRUE),
+                     sd_price = sd(PriceNumeric, na.rm = TRUE),
+                     n_listings = length(PriceNumeric))
+
+# Table/dataset of summary statistics
+df_consoles
+```
+
+\newpage
+
+# Question 2: Brainwave data modeling (16 marks total)
+
+Open the CSV file `Brainwave Data A1.csv` and replace all the zeroes (no reading) with missing data. This dataset has the strength of five different brainwave bands: Delta (the slowest and most 'relaxed'), Theta, Alpha, Beta, and Gamma (the fastest and most 'intense'). It shouldn't be necessary, but if you're interested, the details of the dataset are given in the Mind Monitor app documentation here: <https://mind-monitor.com/FAQ.php#csvspec>
+
+```{r}
+df_brain = read.csv("Brainwave Data A1.csv")
+df_brain$Alpha_AF8[df_brain$Alpha_AF8 == 0] = NA
+df_brain$Beta_AF8[df_brain$Beta_AF8 == 0]  = NA
+df_brain$Gamma_AF8[df_brain$Gamma_AF8 == 0] = NA
+# Correction: Theta_AF8 needs to also be zeroed
+df_brain$Gamma_AF8[df_brain$Theta_AF8 == 0] = NA
+df_brain$Delta_AF8[df_brain$Delta_AF8 == 0] = NA
+```
+
+## Question 2a: They're a complete case! (2 marks)
+
+Find and summarize a linear model for delta wave strength at point AF7 (`Delta_AF7`) as a function of the other brainwave bands at AF7 and AF8, there should be nine such explanatory variables. (Hint: The formula for multiple variables is `Y ~ X1 + X2 + .... + X9`)
+
+------------------------------------------------------------------------
+
+Using `lm` to fit a linear model on `Delta_AF7` as a function fo the others, we get the fit summary statistics below:
+
+```{r}
+# Fit linear model with Delta_AF7 as response variable
+model_complete <- lm(Delta_AF7 ~ Alpha_AF7 + Beta_AF7 + Gamma_AF7 + Theta_AF7 +
+                                 Alpha_AF8 + Beta_AF8 + Gamma_AF8 + Delta_AF8 + Theta_AF8,
+                     data = df_brain)
+
+# Fit summary
+summary(model_complete)
+```
+
+Note that this fit ignores the missing data rows, which is why the p-values and errors for the AF8 estimates are very high.
+
+## Question 2b: With or without you. (5 marks)
+
+Use `ddply` and `cbind` to make a dataset that shows the mean, upper quartile (75th percentile), and standard deviation, and skewness, of all AF7 bands for cases where AF8 bands are missing or measured, respectively. Report the resulting data frame, it should have five rows (Gamma, Alpha, Beta, Theta, Delta), and 8 columns (mean of AF7 when AF8 missing, mean of AF7 when AF8 measured... repeat for upper quartile, standard deviation, and skewness)
+
+You can use the following function definition of skewness
+
+```{r}
+skewness = function(y)
+{
+  output = sum( (y - mean(y))^3) / (sd(y)^3)
+  return(output)
+}
+
+```
+
+------------------------------------------------------------------------
+
+Code to compute the statistics for the AF7 bands for both the missing and present case of AF8 values, then outputting the binded results:
+
+```{r}
+# Create indicator for when AF8 is missing
+df_brain$AF8_missing <- is.na(df_brain$Alpha_AF8)
+
+# Restructure data around AF7 bands with pivot_longer
+df_long <- df_brain %>%
+  pivot_longer(cols = c(Gamma_AF7, Alpha_AF7, Beta_AF7, Theta_AF7, Delta_AF7),
+               names_to = "band",
+               values_to = "value")
+
+# Use ddply to calculate statistics for MISSING group
+stats_missing <- ddply(df_long[df_long$AF8_missing, ], .(band), summarize,
+                       mean_missing = mean(value, na.rm = TRUE),
+                       q75_missing = quantile(value, 0.75, na.rm = TRUE),
+                       sd_missing = sd(value, na.rm = TRUE),
+                       skew_missing = skewness(value[!is.na(value)]))
+
+# Use ddply to calculate statistics for PRESENT group
+stats_present <- ddply(df_long[!df_long$AF8_missing, ], .(band), summarize,
+                       mean_present = mean(value, na.rm = TRUE),
+                       q75_present = quantile(value, 0.75, na.rm = TRUE),
+                       sd_present = sd(value, na.rm = TRUE),
+                       skew_present = skewness(value[!is.na(value)]))
+
+# Use cbind to join over bands
+result_2b <- cbind(stats_missing, stats_present[, -1])
+
+result_2b
+```
+
+## Question 2c: Just not the same without you. (3 marks)
+
+Comment on any differences you systematic differences you see, if any, between the summary statistics of the AF7 measurement when AF8 is present or not. If there are any differences, comment on how that may affect the results from an analysis based on imputation.
+
+------------------------------------------------------------------------
+
+The presence of AF8 seems to shift all the AF7 means consistently down by anything between 0.01-0.02 , upper quartiles by 0.1-0.4, standard deviations by about 0.04-0.07, and skews by 400-600. This suggests that the faulty AF8 readings are not random errors but instead some systematic error that also leads to the noisier AF7 measurements, so they cannot be MCAR.
+
+This would mean that the data is either MAR or MNAR: dependence of the missing AF8 readings on the other data values, or possibly from an external cause not available or inferrable directly from the available data. Without any other knowledge, we can assume it is MAR.
+
+If we were to impute naively as if the data was MCAR (assuming that missingness of AF8 does not affect the rest of the data), we introduce possible bias, as the imputed AF8 values may not reflect the true unmeasured values present in the brain during the stronger and higher variance AF7 activity.
+
+## Question 2d: Mice on the brain. (3 marks)
+
+Impute `df_brain` with `m=5` imputations and the `mice` function in the `mice` package. Then, use `summary` and `pool` to find the pooled estimates of the regression coefficients from the model you built in Question 2b.
+
+------------------------------------------------------------------------
+
+Code for the `m=5` imputation using `mice` and then fitting the linear model, with the summary of the pooled fit results:
+
+```{r}
+# Perform multiple imputation with m=5 imputations
+imp <- mice(df_brain, m = 5, method = "pmm", seed = 123, printFlag = FALSE)
+
+# Fit same model on each of the 5 imputed datasets
+model_imputed <- with(imp, 
+                      lm(Delta_AF7 ~ Alpha_AF7 + Beta_AF7 + Gamma_AF7 + Theta_AF7 +
+                                     Alpha_AF8 + Beta_AF8 + Gamma_AF8 + Delta_AF8 + Theta_AF8))
+
+# Pool the results across the 5 imputations using Rubin's rules
+pooled_results <- pool(model_imputed)
+
+# Pooled fit summary
+summary(pooled_results)
+```
+
+## Question 2e: Of mice and mental. (3 marks)
+
+Compare the estimates and the standard error of the estimates from the models in Questions 2a and 2d. Are the changes to the estimates (or lack of changes) surprising considering the differences in summary statistics that you found in Question 2b?
+
+------------------------------------------------------------------------
+
+All the estimates have non-trivial changes of \~0.1 magnitude. The key improvement is that for many of the AF8 and Gamma_AF7, prior to imputation the fit had non-significant large p-values, all of which were reduced to below 5% in the pooled results. The standard error also dropped across the board, which is expected considering that we impute 5 times so we get a much larger dataset.
+
+Note that the imputed data contains the elevated AF7 values, so it would still contribute a higher variance to the estimate, but because of the number of imputes, it is not surprising we get a much more confident estimate.
